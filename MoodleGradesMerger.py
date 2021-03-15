@@ -5,9 +5,7 @@
 MoodleGradesMerger.py
 Returns a CSV file with every student sorted by the name, containing his/her email, name and exercise's grades
 from a collection of CSV grade files downloaded from Moodle.
-
 Indicate the folder with the Moodle downloaded grade files as an argument when running the script.
-
 Column's name indications are set to Catalan:
 - "Adreça electrònica" for Email
 - "Nom" for Name
@@ -55,6 +53,8 @@ Returns the name of the exercise based no the grades file name
 """
 def get_exercise_name(file_path):
     file_name = file_path.split('/')[-1]
+    # Rewrite ampersands parsed as special chars in filepaths
+    file_name = file_name.replace('amp;', '&')
     return file_name.replace('-qualificacions.csv', '')
 
 
@@ -62,7 +62,10 @@ def get_exercise_name(file_path):
 Returns a float from a number in a comma-separated string format
 """
 def convert_comma_separated_grade_to_float(comma_separated_grade_string):
-    return float(comma_separated_grade_string.replace(',', '.'))
+    if comma_separated_grade_string == '-':
+        return 0.00
+    else:
+        return float(comma_separated_grade_string.replace(',', '.'))
 
 
 """
@@ -116,7 +119,7 @@ def get_students(grades_folder):
 
             for row in moodle_grades_reader:
                 student_email = row[email_column]
-                if student_email is not '':
+                if student_email:
                     add_student_email(student_email)
                     name = row[name_column]
                     surname = row[surname_column]
@@ -132,6 +135,8 @@ def get_exercises(grades_folder):
         EXERCISES_LIST.append(exercise)
         for student_email in STUDENTS_EMAIL_DICT:
             STUDENTS_EMAIL_DICT[student_email][exercise] = 0.00
+    
+    EXERCISES_LIST.sort()
 
 
 """
@@ -150,7 +155,7 @@ def get_grades(grades_folder):
 
             for row in moodle_grades_reader:
                 student_email = row[email_column]
-                if student_email is not '':
+                if student_email:
                     grade_string = row[grade_column]
                     add_grade(student_email, exercise, grade_string)
 
