@@ -104,6 +104,7 @@ def sort_emails_by_student_name():
 
     return sorted_student_emails
 
+
 """
 Adds every student email and name to the STUDENTS_EMAIL_DICT constant
 """
