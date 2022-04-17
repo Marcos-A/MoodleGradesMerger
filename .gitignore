@@ -30,3 +30,6 @@ Temporary Items
 
 # Files used during the export process of the code
 result.csv
+
+# Temporary files
+.~lock.*

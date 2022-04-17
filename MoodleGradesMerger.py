@@ -6,6 +6,8 @@ MoodleGradesMerger.py
 Returns a CSV file with every student sorted by the name, containing his/her email, name and exercise's grades
 from a collection of CSV grade files downloaded from Moodle.
 Indicate the folder with the Moodle downloaded grade files as an argument when running the script.
+In case a percent is indicated, for every exercise this percent is assigned to the maximum achieved grade,
+while the rest is distributed between the other grades. Otherwise for every exercise only the highest grade is preserved.
 Column's name indications are set to Catalan:
 - "Adreça electrònica" for Email
 - "Nom" for Name
@@ -19,10 +21,11 @@ from sys import argv
 import unicodedata
 
 DOWNLOADED_GRADES_FOLDER = argv[1]
-EXERCISES_LIST = []
+EXERCISES_DICT = {}
 STUDENTS_EMAIL_DICT = {}
 RESULT_FILE = 'result.csv'
-
+BETTER_QUALIFICATION_PREVAILS = True
+HIGHER_QUALIFICATION_PERCENT = 0
 
 """
 Returns as list every CSV grades file in the folder
@@ -49,7 +52,7 @@ def get_column_index_in_csv(file_path, text_to_find):
 
 
 """
-Returns the name of the exercise based no the grades file name
+Returns the name of the exercise based on the grades file name
 """
 def get_exercise_name(file_path):
     file_name = file_path.split('/')[-1]
@@ -125,20 +128,19 @@ def get_students(grades_folder):
                     name = row[name_column]
                     surname = row[surname_column]
                     add_student_name(student_email, name, surname)
+                    add_student_exercises_dict(student_email)
 
 
 """
-Adds every exercise to the STUDENTS_EMAIL_DICT and EXERCISES_LIST constants
+Adds every exercise to the STUDENTS_EMAIL_DICT and EXERCISES_DICT constants
 """
 def get_exercises(grades_folder):
     for file_path in collect_grades_files(grades_folder):
         exercise = get_exercise_name(file_path)
-        EXERCISES_LIST.append(exercise)
+        EXERCISES_DICT[exercise] = 1
         for student_email in STUDENTS_EMAIL_DICT:
-            STUDENTS_EMAIL_DICT[student_email][exercise] = 0.00
+            STUDENTS_EMAIL_DICT[student_email]['exercises'][exercise] = ()
     
-    EXERCISES_LIST.sort()
-
 
 """
 Adds every student grade to the STUDENTS_EMAIL_DICT constant
@@ -184,12 +186,20 @@ def add_student_name(student_email, name, surname):
 
 
 """
+Adds an exercises dict to the email in the STUDENTS_EMAIL_DICT constant
+"""
+def add_student_exercises_dict(student_email):
+    STUDENTS_EMAIL_DICT[student_email]['exercises'] = {}
+
+"""
 Adds the grade to the indicated exercise and student email in the STUDENTS_EMAIL_DICT constant
+and updates the EXERCISES_DICT constant
 """
 def add_grade(student_email, exercise, comma_separated_grade_string):
     grade = convert_comma_separated_grade_to_float(comma_separated_grade_string)
-    if STUDENTS_EMAIL_DICT[student_email].get(exercise) < grade:
-        STUDENTS_EMAIL_DICT[student_email][exercise] = grade
+    STUDENTS_EMAIL_DICT[student_email]['exercises'][exercise] += (grade,)
+    if EXERCISES_DICT[exercise] < len(STUDENTS_EMAIL_DICT[student_email]['exercises'][exercise]):
+        EXERCISES_DICT[exercise] = len(STUDENTS_EMAIL_DICT[student_email]['exercises'][exercise])
 
 
 """
@@ -199,19 +209,92 @@ def generate_result_file():
     with open(RESULT_FILE, 'w', newline='', encoding='utf-8') as result:
         result_writer = csv.writer(result)
 
-        exercises_list_header = [exercise for exercise in EXERCISES_LIST]
-        result_writer.writerow(["Correu electrònic"] + ['Nom'] + exercises_list_header)
+        sorted_exercises_dict_keys = sorted(EXERCISES_DICT.keys(), key=lambda x:x)
+        if BETTER_QUALIFICATION_PREVAILS is True:
+            exercises_list_header = [exercise for exercise in sorted_exercises_dict_keys]
+            result_writer.writerow(["Correu electrònic"] + ['Nom'] + exercises_list_header)
+        else:
+            exercises_list_header = []
+            exercises_list_subheader = ["",""]
+            for exercise in sorted_exercises_dict_keys:
+                if EXERCISES_DICT[exercise] == 1:
+                    exercises_list_header.append(exercise)
+                    exercises_list_subheader.append("intent 1")
+                else:
+                    attemps = EXERCISES_DICT[exercise]
+                    exercises_list_header.append(exercise)
+                    exercises_list_subheader.append("intent 1")
+                    i = 2
+                    while i <= attemps:
+                        exercises_list_header.append("")
+                        exercises_list_subheader.append("intent " + str(i))
+                        i += 1
+                    exercises_list_header.append("")
+                    exercises_list_subheader.append("total")
+
+            result_writer.writerow(["Correu electrònic"] + ['Nom'] + exercises_list_header)
+            result_writer.writerow(exercises_list_subheader)
         
         for student_email in sort_emails_by_student_name():
             student_name = STUDENTS_EMAIL_DICT[student_email].get('nom')
-            student_grades_list = [convert_float_to_comma_separated_grade(STUDENTS_EMAIL_DICT[student_email].get(exercise))
-                                   for exercise
-                                   in EXERCISES_LIST]
-            result_writer.writerow([student_email] + [student_name] + student_grades_list)
+            if BETTER_QUALIFICATION_PREVAILS is True:
+                student_grades_list = [convert_float_to_comma_separated_grade(STUDENTS_EMAIL_DICT[student_email]['exercises'].get(exercise)[0])
+                                       for exercise
+                                       in sorted_exercises_dict_keys]
+                result_writer.writerow([student_email] + [student_name] + student_grades_list)
+            else:
+                student_grades_list = []
+                for exercise in sorted_exercises_dict_keys:
+                    if EXERCISES_DICT[exercise] == 1:
+                        student_grades_list.append(STUDENTS_EMAIL_DICT[student_email]['exercises'].get(exercise)[0])
+                    else:
+                        exercise_qualifications = []
+                        for qualification in STUDENTS_EMAIL_DICT[student_email]['exercises'].get(exercise):
+                            student_grades_list.append(qualification)
+                            exercise_qualifications.append(qualification)
+                        total_qualification = obtain_total_qualification_from_multiple_grades(exercise_qualifications)
+                        student_grades_list.append(total_qualification)
+                student_grades_list = [convert_float_to_comma_separated_grade(grade) for grade in student_grades_list]
+
+                result_writer.writerow([student_email] + [student_name] + student_grades_list)
+                        
+
+"""
+Calculates total grade when BETTER_QUALIFICATION_PREVAILS is set to False, assigning
+the HIGHER_QUALIFICATION_PERCENT constant to the maximum grade, and distributing the
+remaning percent between the rest of the grades
+"""
+def obtain_total_qualification_from_multiple_grades(exercise_grades):
+    max_grade = max(exercise_grades)
+    max_grade_index = exercise_grades.index(max(exercise_grades))
+    exercise_grades.pop(max_grade_index)
+    grade_except_max = exercise_grades
+
+    total_qualification = max_grade * HIGHER_QUALIFICATION_PERCENT
+    qualifications_except_max_percent_value = (1 - HIGHER_QUALIFICATION_PERCENT) / len(grade_except_max)
+    for qualification in grade_except_max:
+        total_qualification += qualification * qualifications_except_max_percent_value
+
+    return total_qualification
+
+
+"""
+Adds a 0 for every missing grade in the STUDENDTS_EMAIL_DICT constant
+"""
+def add_missing_grades():
+    for student_email in STUDENTS_EMAIL_DICT.keys():
+        for exercise in STUDENTS_EMAIL_DICT[student_email]['exercises'].keys():
+            exercise_attemps = EXERCISES_DICT.get(exercise)
+            while(len(STUDENTS_EMAIL_DICT[student_email]['exercises'][exercise]) < exercise_attemps):
+                STUDENTS_EMAIL_DICT[student_email]['exercises'][exercise] += (0.00,)
 
 
 if __name__ == "__main__":
+    if len(argv) > 2:
+        BETTER_QUALIFICATION_PREVAILS = False
+        HIGHER_QUALIFICATION_PERCENT = float(argv[2])
     get_students(DOWNLOADED_GRADES_FOLDER)
     get_exercises(DOWNLOADED_GRADES_FOLDER)
     get_grades(DOWNLOADED_GRADES_FOLDER)
+    add_missing_grades()
     generate_result_file()
