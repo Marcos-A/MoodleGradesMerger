@@ -210,12 +210,16 @@ def generate_result_file():
         result_writer = csv.writer(result)
 
         sorted_exercises_dict_keys = sorted(EXERCISES_DICT.keys(), key=lambda x:x)
+
+        # Write headers
         if BETTER_QUALIFICATION_PREVAILS is True:
             exercises_list_header = [exercise for exercise in sorted_exercises_dict_keys]
             result_writer.writerow(["Correu electrònic"] + ['Nom'] + exercises_list_header)
+
         else:
             exercises_list_header = []
             exercises_list_subheader = ["",""]
+            # Append empty spaces for email and name positions
             for exercise in sorted_exercises_dict_keys:
                 if EXERCISES_DICT[exercise] == 1:
                     exercises_list_header.append(exercise)
@@ -231,17 +235,19 @@ def generate_result_file():
                         i += 1
                     exercises_list_header.append("")
                     exercises_list_subheader.append("total")
-
             result_writer.writerow(["Correu electrònic"] + ['Nom'] + exercises_list_header)
             result_writer.writerow(exercises_list_subheader)
         
+        # Write students' grades
         for student_email in sort_emails_by_student_name():
             student_name = STUDENTS_EMAIL_DICT[student_email].get('nom')
+
             if BETTER_QUALIFICATION_PREVAILS is True:
                 student_grades_list = [convert_float_to_comma_separated_grade(STUDENTS_EMAIL_DICT[student_email]['exercises'].get(exercise)[0])
                                        for exercise
                                        in sorted_exercises_dict_keys]
                 result_writer.writerow([student_email] + [student_name] + student_grades_list)
+
             else:
                 student_grades_list = []
                 for exercise in sorted_exercises_dict_keys:
@@ -255,9 +261,8 @@ def generate_result_file():
                         total_qualification = obtain_total_qualification_from_multiple_grades(exercise_qualifications)
                         student_grades_list.append(total_qualification)
                 student_grades_list = [convert_float_to_comma_separated_grade(grade) for grade in student_grades_list]
-
                 result_writer.writerow([student_email] + [student_name] + student_grades_list)
-                        
+
 
 """
 Calculates total grade when BETTER_QUALIFICATION_PREVAILS is set to False, assigning
@@ -266,13 +271,14 @@ remaning percent between the rest of the grades
 """
 def obtain_total_qualification_from_multiple_grades(exercise_grades):
     max_grade = max(exercise_grades)
-    max_grade_index = exercise_grades.index(max(exercise_grades))
+    max_grade_index = exercise_grades.index(max_grade)
+    
     exercise_grades.pop(max_grade_index)
-    grade_except_max = exercise_grades
+    grades_except_max = exercise_grades
 
     total_qualification = max_grade * HIGHER_QUALIFICATION_PERCENT
-    qualifications_except_max_percent_value = (1 - HIGHER_QUALIFICATION_PERCENT) / len(grade_except_max)
-    for qualification in grade_except_max:
+    qualifications_except_max_percent_value = (1 - HIGHER_QUALIFICATION_PERCENT) / (len(grades_except_max))
+    for qualification in grades_except_max:
         total_qualification += qualification * qualifications_except_max_percent_value
 
     return total_qualification
