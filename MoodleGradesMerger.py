@@ -75,8 +75,6 @@ def convert_comma_separated_grade_to_float(comma_separated_grade_string):
 Returns a comma-separated string formatted number with 2 decimals from a float
 """
 def convert_float_to_comma_separated_grade(float_number):
-    if isinstance(float_number, str):
-        print(float_number)
     return(str('{:.2f}'.format(float_number)).replace('.', ','))
 
 
@@ -268,21 +266,19 @@ def generate_result_file():
                         for qualification in STUDENTS_EMAIL_DICT[student_email]['exercises'].get(exercise):
                             student_grades_list.append(qualification)
                             exercise_qualifications.append(qualification)
-                        total_qualification, exercise_grades_percents_list = obtain_total_qualification_from_multiple_grades_and_percents_distribution(
+                        total_qualification = obtain_total_qualification_from_multiple_grades_and_percents_distribution(
                                                                                 exercise_qualifications)
                         student_grades_list.append(total_qualification)
-                        grades_percents_list += exercise_grades_percents_list
                 student_grades_list = [convert_float_to_comma_separated_grade(grade) for grade in student_grades_list]
                 result_writer.writerow([student_email] + [student_name] + student_grades_list)
-
-        if ONLY_BETTER_QUALIFICATION_PREVAILS is False:
-            result_writer.writerow(grades_percents_list)
 
 
 """
 Calculates total grade when ONLY_BETTER_QUALIFICATION_PREVAILS is set to False, assigning
 the HIGHER_QUALIFICATION_PERCENT constant to the maximum grade, and distributing the
-remaning percent between the rest of the grades
+remaning percent between the rest of the grades. Grades not greater than zero are discarded.
+In case every grade is zero but for one (for instace, when only a single attempt was made) the single
+grade greater than zero will prevail.
 """
 def obtain_total_qualification_from_multiple_grades_and_percents_distribution(exercise_grades):
     max_grade = max(exercise_grades)
@@ -290,30 +286,25 @@ def obtain_total_qualification_from_multiple_grades_and_percents_distribution(ex
     
     total_qualification = max_grade * HIGHER_QUALIFICATION_PERCENT
     qualifications_except_max_percent_value = (1 - HIGHER_QUALIFICATION_PERCENT) / (len(exercise_grades)-1)
-
-    exercise_grades_percents_list = []
-    for idx in exercise_grades:
-        if idx == max_grade_index:
-            exercise_grades_percents_list.append(str(HIGHER_QUALIFICATION_PERCENT*100)+"%")
-            print(exercise_grades_percents_list)
-        else:
-            exercise_grades_percents_list.append(str(round(qualifications_except_max_percent_value,2))+"%")
-    # Append empty space for "total"
-    exercise_grades_percents_list.append("")
     
     exercise_grades.pop(max_grade_index)
     grades_except_max = exercise_grades
+    # If a single attempt was made or every attempt is zero but one, the only attempt with a grade greater than zero prevails
+    if all(grade == 0 for grade in grades_except_max):
+        total_qualification = max_grade
+    else:
+        total_qualification = max_grade * HIGHER_QUALIFICATION_PERCENT
+        # Grades with a zero are discarded
+        grades_except_max = [grade for grade in grades_except_max if grade > 0]
+        qualifications_except_max_percent_value = (1 - HIGHER_QUALIFICATION_PERCENT) / len(grades_except_max)
+        for qualification in grades_except_max:
+            total_qualification += qualification * qualifications_except_max_percent_value
 
-    total_qualification = max_grade * HIGHER_QUALIFICATION_PERCENT
-    qualifications_except_max_percent_value = (1 - HIGHER_QUALIFICATION_PERCENT) / len(grades_except_max)
-    for qualification in grades_except_max:
-        total_qualification += qualification * qualifications_except_max_percent_value
-
-    return total_qualification, exercise_grades_percents_list
+    return total_qualification
 
 
 """
-Adds a 0 for every missing grade in the STUDENDTS_EMAIL_DICT constant
+Adds a zero for every missing grade in the STUDENDTS_EMAIL_DICT constant
 """
 def add_missing_grades():
     for student_email in STUDENTS_EMAIL_DICT.keys():

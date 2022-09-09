@@ -4,7 +4,7 @@ from a collection of CSV grade files downloaded from Moodle.
 In case a percent is indicated, for every exercise this percent is assigned to the maximum achieved grade,
 while the rest is distributed between the other grades.
 
-For instance, if there has been 3 attemps for an exercise and 0.7 is set as a percent, 70% of the exercise qualification will be assigned to the highest grade, while 15% will be assigned to the remaining attempts.
+For instance, if there has been 3 attemps for an exercise and 0.7 is set as a percent, 70% of the exercise qualification will be assigned to the highest grade, while 15% will be assigned to the remaining attempts. Attempts not made or with a grade equal to zero are discarded by design; e.g. if there has been 3 attemps and the grade of one of them is equal to zero or it was never submitted, it will be evaluated as if there were only 2 attempts.
 
 ## Requirements
 Column's name indications are set to Catalan:

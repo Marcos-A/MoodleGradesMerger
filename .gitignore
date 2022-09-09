@@ -33,3 +33,11 @@ result.csv
 
 # Temporary files
 .~lock.*
+
+# Python compiled bytecode
+*.pyc
+__pycache__/
+*/__pycache__/
+
+# VS Code editor data
+.vscode/*
